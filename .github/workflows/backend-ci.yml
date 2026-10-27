@@ -1,0 +1,54 @@
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:18-3.6
+        env:
+          POSTGRES_DB: gameclubfinder_test
+          POSTGRES_USER: gameclub_test
+          POSTGRES_PASSWORD: test-only-not-a-production-secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gameclub_test -d gameclubfinder_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      CORS_ORIGIN: http://localhost:5173
+      LOG_LEVEL: silent
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: gameclubfinder_test
+      DB_USER: gameclub_test
+      DB_PASSWORD: test-only-not-a-production-secret
+      JWT_ACCESS_SECRET: test-only-secret-not-for-production-32chars
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run db:migrate
+      - run: npm run db:seed
+      - run: npm test
+      - run: npm run build
+      - name: Build production container image
+        run: docker build --tag gameclubfinder-api:${{ github.sha }} .

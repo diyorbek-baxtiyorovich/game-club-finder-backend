@@ -4,24 +4,46 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "tsx --test",
+    "db:check": "tsx src/database/check.ts",
+    "db:seed": "tsx src/database/seed.ts",
+    "db:migrate": "tsx src/database/migrate.ts up",
+    "db:rollback": "tsx src/database/migrate.ts down",
+    "db:migrate:prod": "node dist/database/migrate.js up",
+    "db:rollback:prod": "node dist/database/migrate.js down"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
-    "express": "^4.21.2"
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "jose": "^6.2.13",
+    "node-pg-migrate": "^9.0.0",
+    "pg": "^8.16.3",
+    "pino": "^10.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
+    "@types/express": "^5.0.3",
     "@types/node": "^22.15.0",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
+    "eslint": "^10.13.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.72.1",
+    "yaml": "^2.9.1"
   }
 }

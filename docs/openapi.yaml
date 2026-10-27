@@ -1,0 +1,305 @@
+openapi: 3.1.0
+info:
+  title: GameClubFinder API
+  version: 1.0.0
+  description: Backend contract. All listed paths except /api/health use the /api/v1 prefix.
+servers:
+  - url: /api/v1
+tags:
+  - { name: Tizim, description: Server va ma’lumotlar bazasi holati }
+  - { name: O‘yinlar, description: O‘yinlar katalogi }
+  - { name: Autentifikatsiya, description: Telegram orqali kirish va tokenlar }
+  - { name: Foydalanuvchi, description: Joriy foydalanuvchi profili }
+  - { name: Klublar, description: Klub profili va uni boshqarish }
+  - { name: Qidiruv, description: Yaqin klublar va kengaytirilgan qidiruv }
+  - { name: Mavjudlik, description: Klubning ish vaqti va ochiqligi }
+  - { name: Media, description: Klub rasmlari }
+  - { name: Sharhlar, description: Klub sharhlari va ularga javoblar }
+  - { name: Sevimlilar, description: Foydalanuvchining sevimli klublari }
+  - { name: Tarix, description: Ko‘rilgan klublar tarixi }
+  - { name: Moderatsiya, description: Klub va sharhlarni tasdiqlash }
+  - { name: Statistika, description: Klub va tizim statistikasi }
+  - { name: Audit, description: Tizimdagi audit hodisalari }
+paths:
+  /api/health:
+    get:
+      tags: [Tizim]
+      summary: Server va baza holatini tekshirish
+      servers:
+        - url: /
+      responses:
+        '200':
+          description: Database is reachable
+  /games:
+    get:
+      tags: [O‘yinlar]
+      summary: O‘yinlar ro‘yxati
+      responses:
+        '200': { description: Game catalog }
+  /games/popular:
+    get:
+      tags: [O‘yinlar]
+      summary: Ommabop o‘yinlar ro‘yxati
+      responses:
+        '200': { description: Popular games }
+  /auth/telegram:
+    post:
+      tags: [Autentifikatsiya]
+      summary: Telegram Mini App orqali kirish
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [initData]
+              properties:
+                initData: { type: string, minLength: 1, maxLength: 8192 }
+      responses:
+        '200': { description: User and token pair }
+        '400': { description: Invalid request }
+        '401': { description: Invalid or expired Telegram data }
+        '429': { description: Rate limit exceeded }
+  /auth/refresh:
+    post:
+      tags: [Autentifikatsiya]
+      summary: Access tokenni yangilash
+      responses:
+        '200': { description: New token pair }
+        '401': { description: Invalid, expired, or reused token }
+  /auth/logout:
+    post:
+      tags: [Autentifikatsiya]
+      summary: Tizimdan chiqish
+      responses:
+        '200': { description: Logged out }
+  /users/me:
+    get:
+      tags: [Foydalanuvchi]
+      security: [{ bearerAuth: [] }]
+      summary: Joriy foydalanuvchini ko‘rish
+      responses:
+        '200': { description: Current user }
+        '401': { description: Authentication required }
+  /clubs:
+    get:
+      tags: [Klublar]
+      summary: Ochiq klublar ro‘yxati
+      parameters:
+        - { in: query, name: q, schema: { type: string } }
+        - { in: query, name: city, schema: { type: string } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200': { description: Paginated club list }
+    post:
+      tags: [Klublar]
+      security: [{ bearerAuth: [] }]
+      summary: Yangi klub yaratish
+      responses:
+        '201': { description: Created pending club }
+        '401': { description: Authentication required }
+        '403': { description: Role not allowed }
+  /clubs/nearby:
+    get:
+      tags: [Qidiruv]
+      summary: Yaqin klublarni topish
+      parameters:
+        - { in: query, name: lat, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { in: query, name: lng, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+        - { in: query, name: radius, schema: { type: integer, minimum: 1, maximum: 50000 } }
+      responses:
+        '200': { description: Nearby clubs and distances }
+        '400': { description: Invalid coordinates or query }
+  /search:
+    post:
+      tags: [Qidiruv]
+      summary: Klublarni filtrlar bilan qidirish
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Filtered clubs and pagination metadata }
+        '400': { description: Invalid filters }
+  /filters/options:
+    get:
+      tags: [Qidiruv]
+      summary: Mavjud filtr variantlarini olish
+      responses:
+        '200': { description: Catalog-backed filter options }
+  /clubs/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: '^[1-9][0-9]*$' } }
+    get:
+      tags: [Klublar]
+      summary: Klub profilini ko‘rish
+      responses:
+        '200': { description: Club profile }
+        '404': { description: Hidden or missing club }
+    put:
+      tags: [Klublar]
+      security: [{ bearerAuth: [] }]
+      summary: O‘z klubini yangilash
+      responses:
+        '200': { description: Updated club }
+        '403': { description: Ownership or role check failed }
+    delete:
+      tags: [Klublar]
+      security: [{ bearerAuth: [] }]
+      summary: O‘z klubini faolsizlantirish
+      responses:
+        '200': { description: Club deactivated }
+  /clubs/{id}/availability:
+    get:
+      tags: [Mavjudlik]
+      summary: Klub hozir ochiqligini ko‘rish
+      responses:
+        '200': { description: Availability and timezone }
+  /clubs/{id}/stats:
+    get:
+      tags: [Statistika]
+      security: [{ bearerAuth: [] }]
+      summary: O‘z klubi statistikasini ko‘rish
+      responses:
+        '200': { description: Club statistics }
+        '403': { description: Role or ownership check failed }
+  /clubs/{id}/images:
+    post:
+      tags: [Media]
+      security: [{ bearerAuth: [] }]
+      summary: Klub rasmini yuklash
+      requestBody:
+        required: true
+        content:
+          image/jpeg: { schema: { type: string, format: binary } }
+          image/png: { schema: { type: string, format: binary } }
+          image/webp: { schema: { type: string, format: binary } }
+      responses:
+        '201': { description: Image metadata }
+        '413': { description: Image exceeds size limit }
+  /media/{id}:
+    get:
+      tags: [Media]
+      summary: Klub rasmini olish
+      responses:
+        '200': { description: Image bytes }
+        '404': { description: Missing or hidden image }
+  /clubs/{id}/reviews:
+    get:
+      tags: [Sharhlar]
+      summary: Klub sharhlarini ko‘rish
+      responses:
+        '200': { description: Approved reviews }
+    post:
+      tags: [Sharhlar]
+      security: [{ bearerAuth: [] }]
+      summary: Klubga sharh yozish
+      responses:
+        '201': { description: Pending review }
+  /reviews/{id}:
+    put:
+      tags: [Sharhlar]
+      security: [{ bearerAuth: [] }]
+      summary: O‘z sharhini tahrirlash
+      responses:
+        '200': { description: Updated pending review }
+        '403': { description: Review ownership check failed }
+    delete:
+      tags: [Sharhlar]
+      security: [{ bearerAuth: [] }]
+      summary: O‘z sharhini o‘chirish
+      responses:
+        '200': { description: Review deleted }
+  /reviews/{id}/reply:
+    post:
+      tags: [Sharhlar]
+      security: [{ bearerAuth: [] }]
+      summary: Klub egasi sifatida javob berish
+      responses:
+        '200': { description: Saved owner reply }
+  /reviews/{id}/helpful:
+    post:
+      tags: [Sharhlar]
+      security: [{ bearerAuth: [] }]
+      summary: Sharhni foydali deb belgilash
+      responses:
+        '200': { description: Helpful vote result }
+  /admin/reviews/{id}/status:
+    patch:
+      tags: [Moderatsiya]
+      security: [{ bearerAuth: [] }]
+      summary: Sharhni tasdiqlash yoki rad etish
+      responses:
+        '200': { description: Updated moderation status }
+  /favorites:
+    get:
+      tags: [Sevimlilar]
+      security: [{ bearerAuth: [] }]
+      summary: Sevimli klublar ro‘yxati
+      responses:
+        '200': { description: Paginated favorites }
+  /favorites/{clubId}:
+    post:
+      tags: [Sevimlilar]
+      security: [{ bearerAuth: [] }]
+      summary: Klubni sevimlilarga qo‘shish
+      responses:
+        '200': { description: Favorite created or already present }
+    delete:
+      tags: [Sevimlilar]
+      security: [{ bearerAuth: [] }]
+      summary: Klubni sevimlilardan olib tashlash
+      responses:
+        '200': { description: Favorite removal result }
+  /history:
+    get:
+      tags: [Tarix]
+      security: [{ bearerAuth: [] }]
+      summary: Ko‘rilgan klublar tarixini ko‘rish
+      responses:
+        '200': { description: Paginated history }
+  /admin/stats:
+    get:
+      tags: [Statistika]
+      security: [{ bearerAuth: [] }]
+      summary: Tizim statistikasini ko‘rish
+      responses:
+        '200': { description: Admin statistics }
+        '403': { description: Admin role required }
+  /admin/audit:
+    get:
+      tags: [Audit]
+      security: [{ bearerAuth: [] }]
+      summary: Audit hodisalari ro‘yxati
+      responses:
+        '200': { description: Audit event list }
+        '403': { description: Admin role required }
+  /admin/clubs/pending:
+    get:
+      tags: [Moderatsiya]
+      security: [{ bearerAuth: [] }]
+      summary: Tasdiq kutayotgan klublar
+      responses:
+        '200': { description: Pending club page }
+  /admin/clubs/{id}/status:
+    patch:
+      tags: [Moderatsiya]
+      security: [{ bearerAuth: [] }]
+      summary: Klubni tasdiqlash yoki rad etish
+      responses:
+        '200': { description: Updated club status }
+  /clubs/{id}/status:
+    get:
+      tags: [Moderatsiya]
+      security: [{ bearerAuth: [] }]
+      summary: O‘z klubi moderatsiya holatini ko‘rish
+      responses:
+        '200': { description: Club submission status }
+        '403': { description: Role or ownership check failed }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+*.log
+var/media
+backups
+certs
