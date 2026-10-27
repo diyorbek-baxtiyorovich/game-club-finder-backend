@@ -1,0 +1,7 @@
+# Keep LF everywhere so scripts and configs work in Linux containers and CI.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
