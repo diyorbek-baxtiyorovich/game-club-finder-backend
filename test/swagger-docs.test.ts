@@ -8,7 +8,8 @@ const app = createApp();
 test("Swagger UI and its OpenAPI document are served from /api/docs", async () => {
   const page = await request(app).get("/api/docs").expect(200);
   assert.match(page.headers["content-type"], /text\/html/);
-  assert.match(page.text, /Swagger UI/);
+  assert.match(page.text, /id="swagger-ui"/);
+  assert.match(page.text, /swagger-ui-bundle\.js/);
   assert.match(page.text, /\/api\/docs\/init\.js/);
 
   const initializer = await request(app).get("/api/docs/init.js").expect(200);
