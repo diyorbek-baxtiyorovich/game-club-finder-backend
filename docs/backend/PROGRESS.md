@@ -37,6 +37,12 @@
 > Codex har bosqich oxirida **faqat joriy bosqich** natijasini shu yerga yozadi. Eski hisobotlarni o‘chirmasdan qisqa arxiv sifatida qoldirishi mumkin.
 
 ```text
+Ish: Lokal frontend uchun demo ma’lumotlar (bosqichdan tashqari)
+Holat: DONE — `npm run db:seed:demo` (src/database/seed-demo.ts): 12 klub (10 approved, 1 pending, 1 rejected + moderatsiya sababi), jihoz/xona/xizmat/narx/o‘yin/ish vaqti/3 rasm URL, 19 sharh (1 pending, 2 egasi javobi bilan), dev user uchun 3 favorite va history. Qayta ishga tushirsa dublikat yo‘q (slug upsert), productionda ishlamaydi.
+Tekshiruv: typecheck/lint PASS; toza PostGIS test bazasida ikki marta ketma-ket ishga tushirildi — sonlar o‘zgarmadi (12 klub, 19 sharh, 36 rasm); dev bazaga yozildi; API: /clubs 10, detail/reviews/nearby/search/admin pending/favorites/owner stats demo ma’lumotni qaytardi.
+```
+
+```text
 Ish: Lokal frontend uchun auth’ni vaqtincha o‘chirish (bosqichdan tashqari)
 Holat: DONE — `.env`da AUTH_DISABLED=true. Token’siz so‘rovlar dev user (default admin, X-Dev-Role: user|club_owner|admin) sifatida bajariladi; real Bearer token bo‘lsa oddiy JWT tekshiruvi.
 Xavfsizlik: NODE_ENV=production + AUTH_DISABLED=true → env xatosi, server ishga tushmaydi; startup’da ogohlantirish logi; npm test bypass’ni majburan o‘chiradi.

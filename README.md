@@ -65,6 +65,17 @@ Telegram bot ulanmaguncha frontendni lokal qurish uchun `.env`da `AUTH_DISABLED=
 - `NODE_ENV=production` bilan `AUTH_DISABLED=true` bo‘lsa server ishga tushmaydi. `npm test` bu sozlamani har doim o‘chirib ishlaydi.
 - Telegram login tayyor bo‘lgach `AUTH_DISABLED=false` qiling.
 
+## Demo ma’lumotlar (lokal frontend uchun)
+
+```powershell
+npm run db:seed        # o‘yinlar katalogi (bir marta)
+npm run db:seed:demo   # 12 ta demo klub
+```
+
+12 ta klub (Toshkent, Samarqand, Buxoro, Namangan): 10 tasi tasdiqlangan, 1 tasi `pending` (admin moderatsiya ekrani uchun), 1 tasi `rejected`. Har birida jihozlar, xona turlari, xizmatlar, UZS narxlar, o‘yinlar, ish vaqti (24/7, tungi, dam olish kunlari boshqacha), 3 ta rasm URL (picsum.photos) va jami 19 ta sharh (ayrimlarida egasining javobi bilan). `CyberArena Chilonzor` va `Pixel Hub Yunusobod` dev `club_owner`ga tegishli, dev `user`da 3 ta sevimli va ko‘rish tarixi bor. Shu sababli `AUTH_DISABLED=true` va `X-Dev-Role` bilan har bir rol uchun ma’lumot ko‘rinadi.
+
+Skriptni qayta ishga tushirsa bo‘ladi: klublar `demo-` slug bo‘yicha yangilanadi, dublikat yaratilmaydi. `NODE_ENV=production`da ishlamaydi.
+
 ## Testlar
 
 Testlar real PostgreSQL/PostGIS bazasiga ulanadi. Ular fixture ma’lumotlarni vaqtincha yozib, asosiy qatorlarni testdan so‘ng tozalaydi; append-only audit hodisalari saqlanadi. Testni ishlab turgan yoki muhim ma’lumotli bazada emas, alohida lokal baza bilan bajaring.
