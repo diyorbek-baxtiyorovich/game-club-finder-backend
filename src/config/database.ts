@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 import { AppError } from "../common/errors/app-error.js";
 import { logger } from "../common/logger.js";
@@ -21,6 +21,32 @@ databasePool.on("error", () => {
     "Ma’lumotlar bazasi ulanishida xatolik yuz berdi",
   );
 });
+
+/**
+ * Runs `work` inside BEGIN/COMMIT on one pooled client.
+ * A failed ROLLBACK never hides the original error, and a broken
+ * client is evicted from the pool instead of being reused.
+ */
+export async function withTransaction<T>(
+  work: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await databasePool.connect();
+  let releaseError: Error | undefined;
+  try {
+    await client.query("BEGIN");
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch((rollbackError: unknown) => {
+      releaseError =
+        rollbackError instanceof Error ? rollbackError : new Error("ROLLBACK failed");
+    });
+    throw error;
+  } finally {
+    client.release(releaseError);
+  }
+}
 
 export async function checkDatabase(): Promise<void> {
   try {

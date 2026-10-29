@@ -1,6 +1,7 @@
 import { rateLimit } from "express-rate-limit";
 import { Router } from "express";
 import { z } from "zod";
+import { AppError } from "../../common/errors/app-error.js";
 import { validate } from "../../middleware/validate.js";
 import { authService, type LoginResult } from "./auth.service.js";
 
@@ -26,15 +27,15 @@ function limiter(limit: number) {
     limit,
     standardHeaders: true,
     legacyHeaders: false,
-    handler: (_request, response) => {
-      response.status(429).json({
-        success: false,
-        error: {
-          code: "RATE_LIMITED",
-          message:
-            "Kirish so‘rovlari soni chegaradan oshdi. Birozdan so‘ng qayta urinib ko‘ring.",
-        },
-      });
+    // Goes through the shared error handler so 429 has the same shape (with requestId).
+    handler: (_request, _response, next) => {
+      next(
+        new AppError(
+          429,
+          "RATE_LIMITED",
+          "Kirish so‘rovlari soni chegaradan oshdi. Birozdan so‘ng qayta urinib ko‘ring.",
+        ),
+      );
     },
   });
 }

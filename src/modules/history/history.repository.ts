@@ -1,4 +1,4 @@
-import { databasePool } from "../../config/database.js";
+import { withTransaction } from "../../config/database.js";
 import type { PoolClient } from "pg";
 import type { HistoryListQuery } from "./history.schema.js";
 
@@ -16,20 +16,6 @@ interface HistoryRow {
 const visibleHistory = `FROM view_history h JOIN game_clubs c ON c.id = h.club_id
   WHERE h.user_id = $1 AND c.status = 'approved' AND c.is_active = true`;
 
-async function transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await databasePool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await work(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
 
 async function prune(client: PoolClient, userId: string): Promise<void> {
   await client.query(
@@ -45,7 +31,7 @@ async function prune(client: PoolClient, userId: string): Promise<void> {
 }
 
 export async function recordView(userId: string, clubId: string): Promise<void> {
-  await transaction(async (client) => {
+  await withTransaction(async (client) => {
     // One user's concurrent requests serialize before upsert and retention cleanup.
     await client.query("SELECT id FROM users WHERE id = $1 FOR UPDATE", [userId]);
     await client.query(
@@ -59,7 +45,7 @@ export async function recordView(userId: string, clubId: string): Promise<void> 
 }
 
 export async function listHistory(userId: string, query: HistoryListQuery) {
-  return transaction(async (client) => {
+  return withTransaction(async (client) => {
     await client.query("SELECT id FROM users WHERE id = $1 FOR UPDATE", [userId]);
     await prune(client, userId);
     const items = await client.query<HistoryRow>(

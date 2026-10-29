@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { AppError } from "../../common/errors/app-error.js";
-import { getPublicImage, storeClubImage, validateImage } from "./media.repository.js";
+import { deleteClubImage, getPublicImage, storeClubImage, validateImage } from "./media.repository.js";
 import type { MediaCategory } from "./media.schema.js";
 
 const categories = new Set<MediaCategory>(["cover", "interior", "equipment"]);
@@ -33,4 +33,10 @@ export const servePublicImage: RequestHandler = async (_request, response) => {
   response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.send(image.bytes);
+};
+
+export const removeClubImage: RequestHandler = async (request, response) => {
+  const { id: clubId, imageId } = response.locals.validatedRequest.params as { id: string; imageId: string };
+  await deleteClubImage(request.auth!.id, clubId, imageId);
+  response.status(204).end();
 };

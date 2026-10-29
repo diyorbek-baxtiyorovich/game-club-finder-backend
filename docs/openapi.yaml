@@ -178,6 +178,18 @@ paths:
       responses:
         '201': { description: Image metadata }
         '413': { description: Image exceeds size limit }
+  /clubs/{id}/images/{imageId}:
+    delete:
+      tags: [Media]
+      security: [{ bearerAuth: [] }]
+      summary: Klub rasmini o‘chirish
+      description: Faqat klub egasi. Yuklangan fayl ham saqlash joyidan o‘chiriladi. Klubni PUT bilan yangilash yuklangan rasmlarga tegmaydi.
+      parameters:
+        - { name: imageId, in: path, required: true, schema: { type: string, pattern: '^[1-9][0-9]*$' } }
+      responses:
+        '204': { description: Image deleted }
+        '403': { description: Not the club owner }
+        '404': { description: Club or image not found }
   /media/{id}:
     get:
       tags: [Media]
@@ -191,6 +203,7 @@ paths:
       summary: Klub sharhlarini ko‘rish
       responses:
         '200': { description: Approved reviews }
+        '404': { description: Club is missing, not approved or inactive }
     post:
       tags: [Sharhlar]
       security: [{ bearerAuth: [] }]

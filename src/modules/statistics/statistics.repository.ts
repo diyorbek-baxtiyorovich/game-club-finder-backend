@@ -41,7 +41,7 @@ export async function getAdminStatistics() {
         count(*) FILTER (WHERE is_active AND status='pending')::text pending,
         count(*) FILTER (WHERE is_active AND status='approved')::text approved,
         count(*) FILTER (WHERE is_active AND status='rejected')::text rejected,
-        count(*) FILTER (WHERE created_at >= current_timestamp - interval '30 days')::text new_30_days
+        count(*) FILTER (WHERE is_active AND created_at >= current_timestamp - interval '30 days')::text new_30_days
        FROM game_clubs`,
     ),
     databasePool.query<{ total: string; active_30_days: string }>(
@@ -83,7 +83,7 @@ export async function listAuditEvents(query: AuditListQuery) {
     created_at: Date;
   }>(
     `SELECT id::text, actor_id::text, entity_type, entity_id, action, changed_fields, metadata, created_at
-     FROM audit_events ORDER BY id DESC LIMIT $1`, [query.limit],
+     FROM audit_events ORDER BY audit_events.id DESC LIMIT $1`, [query.limit],
   );
   return result.rows.map((row) => ({
     id: row.id,

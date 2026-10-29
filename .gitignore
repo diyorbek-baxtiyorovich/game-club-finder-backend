@@ -5,6 +5,7 @@ dist/
 !.env.example
 *.log
 /var/media/
+/var/certbot/
 /backups/
 /certs/
 .idea/

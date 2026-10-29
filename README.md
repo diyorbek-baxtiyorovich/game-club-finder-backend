@@ -43,7 +43,7 @@ npm run db:migrate
 npm run db:check
 ```
 
-Migratsiya PostGIS kengaytmasini yoqadi va boshlang‘ich `users` jadvalini yaratadi. PostGIS extension yaratish huquqi yetarli bo‘lishi kerak.
+Migratsiyalar (`database/migrations/`) PostGIS kengaytmasini yoqadi va barcha jadvallarni (users, clubs, reviews, audit va boshqalar) ketma-ket yaratadi. PostGIS extension yaratish huquqi yetarli bo‘lishi kerak.
 
 ## Autentifikatsiya
 
@@ -59,6 +59,19 @@ Access token 15 daqiqa, refresh token 30 kun amal qiladi. Owner rolini berish wo
 ## Testlar
 
 Testlar real PostgreSQL/PostGIS bazasiga ulanadi. Ular fixture ma’lumotlarni vaqtincha yozib, asosiy qatorlarni testdan so‘ng tozalaydi; append-only audit hodisalari saqlanadi. Testni ishlab turgan yoki muhim ma’lumotli bazada emas, alohida lokal baza bilan bajaring.
+
+`npm test` himoyalangan: `DB_NAME` `_test` bilan tugamasa (masalan dev baza `gameclubfinder_db`), testlar ishga tushmaydi.
+
+**Eng oson yo‘l — Docker'da vaqtinchalik test bazasi** (CI bilan bir xil PostGIS 18 image):
+
+```powershell
+docker run -d --name gcf-test-db -e POSTGRES_DB=gameclubfinder_test -e POSTGRES_USER=gameclub_test -e POSTGRES_PASSWORD=test-only-not-a-production-secret -p 127.0.0.1:55432:5432 postgis/postgis:18-3.6
+$env:NODE_ENV = 'test'; $env:DB_HOST = '127.0.0.1'; $env:DB_PORT = '55432'; $env:DB_NAME = 'gameclubfinder_test'; $env:DB_USER = 'gameclub_test'; $env:DB_PASSWORD = 'test-only-not-a-production-secret'
+npm run db:migrate; npm run db:seed; npm test
+docker rm -f gcf-test-db   # ish tugagach
+```
+
+**Yoki mavjud lokal PostgreSQL'da:**
 
 PostgreSQL o‘rnatilgan PowerShell oynasida (database yaratish huquqiga ega rol bilan) bir marta test bazasini yarating:
 
@@ -83,6 +96,6 @@ npm run build
 Remove-Item Env:DB_NAME
 ```
 
-`npm run db:migrate` test bazasiga schema qo‘llaydi; `npm run db:seed` o‘yin katalogini tayyorlaydi. Integratsion testlar PostGIS geospatial qidiruvni, PostgreSQL repository qatlamlarini, CRUD, filtrlash, role/ownership ruxsatlari va xavfsizlik chegaralarini tekshiradi. E2E so‘rovlari Express ilovasiga Supertest bilan yuboriladi. `npm run test`ni `tsx --test` orqali ishlating.
+`npm run db:migrate` test bazasiga schema qo‘llaydi; `npm run db:seed` o‘yin katalogini tayyorlaydi. Integratsion testlar PostGIS geospatial qidiruvni, PostgreSQL repository qatlamlarini, CRUD, filtrlash, role/ownership ruxsatlari va xavfsizlik chegaralarini tekshiradi. E2E so‘rovlari Express ilovasiga Supertest bilan yuboriladi. `npm test` har bir test jarayoniga `test/setup/db-guard.ts` himoyasini yuklaydi.
 
 Joriy endpoint va response kontraktlari [docs/API.md](docs/API.md), OpenAPI 3.1 spetsifikatsiyasi [docs/openapi.yaml](docs/openapi.yaml) fayllarida. Backend v1 kontrakti shu hujjatlarda muzlatilgan; frontend hozir mock repository ishlatadi va ushbu hujjat uning API ulash manbasi hisoblanadi.

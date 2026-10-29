@@ -19,8 +19,8 @@ import {
   createClubRequestSchema,
   updateClubRequestSchema,
 } from "./club.schema.js";
-import { uploadClubImage } from "../media/media.controller.js";
-import { mediaClubIdRequestSchema } from "../media/media.schema.js";
+import { removeClubImage, uploadClubImage } from "../media/media.controller.js";
+import { mediaClubIdRequestSchema, mediaClubImageRequestSchema } from "../media/media.schema.js";
 import { mediaUploadBody } from "../media/media.routes.js";
 import { getClubStatistics } from "../statistics/statistics.controller.js";
 import { clubStatisticsRequestSchema } from "../statistics/statistics.schema.js";
@@ -47,6 +47,13 @@ clubsRouter.post(
   validate(mediaClubIdRequestSchema),
   mediaUploadBody,
   uploadClubImage,
+);
+clubsRouter.delete(
+  "/:id/images/:imageId",
+  authenticate,
+  requireRoles("club_owner"),
+  validate(mediaClubImageRequestSchema),
+  removeClubImage,
 );
 clubsRouter.get(
   "/:id",

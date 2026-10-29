@@ -19,11 +19,12 @@ Authentication uses `Authorization: Bearer <accessToken>`. Access tokens expire 
 | `GET /clubs/nearby` | Public | `lat` and `lng` together with optional `radius` (1–50,000 m), or `city`; returns approved active clubs. |
 | `GET /clubs/:id` | Public; optional token | Full public club profile; authenticated reads can record view history. |
 | `POST /clubs` | `club_owner` or `admin` | Creates a pending club. Body includes name, slug, address, `{lng,lat}` and optional equipment, features, pricing, images, gameIds, workingHours, timezone. |
-| `PUT /clubs/:id` | `club_owner` or `admin`; object ownership checked | Updates supplied club fields. |
+| `PUT /clubs/:id` | `club_owner` or `admin`; object ownership checked | Updates supplied club fields. An `images` array replaces only URL-based images; uploaded images are kept. |
 | `DELETE /clubs/:id` | `club_owner` or `admin`; object ownership checked | Soft-deletes the club. |
 | `GET /clubs/:id/availability` | Public | Current open state and timezone; occupancy is `unknown` until a live source is connected. |
 | `GET /clubs/:id/stats` | Club owner or admin; owner limited to own club | Club views, unique viewers, favorites, and public rating summary. |
 | `POST /clubs/:id/images` | Club owner; owner checked | Uploads JPEG, PNG, or WebP bytes. Headers: matching `Content-Type`, `X-Media-Category` (`cover`, `interior`, `equipment`), optional `X-Display-Order`. Max 8 MiB. |
+| `DELETE /clubs/:id/images/:imageId` | Club owner; owner checked | Deletes one club image (row and uploaded file). Returns 204. |
 | `GET /media/:id` | Public | Reads an image belonging to a public active club. |
 | `GET /clubs/:id/reviews` | Public | Lists public, approved reviews for a club. |
 | `POST /clubs/:id/reviews` | Authenticated `user` | Creates a review with six integer 1–5 ratings and text; submitted for moderation. |

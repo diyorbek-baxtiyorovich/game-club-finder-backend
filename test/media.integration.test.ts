@@ -188,3 +188,51 @@ test("club image upload checks ownership, image bytes, size, count and serves it
   assert.equal(metadata.mimeType, "image/png");
   assert.equal(metadata.sizeBytes, png.length);
 });
+
+test("profile updates keep uploaded images; owners delete them through the image endpoint", async () => {
+  const owner = await createUser();
+  const stranger = await createUser();
+  const clubId = await createClub(owner.id);
+  const uploaded = await upload(clubId, owner.token, png, "image/png", "cover", 0);
+  assert.equal(uploaded.status, 201);
+  const { id: imageId, url } = ((await uploaded.json()) as { data: { id: string; url: string } }).data;
+  const storageKey = (
+    await databasePool.query<{ storage_key: string }>("SELECT storage_key FROM club_images WHERE id=$1", [imageId])
+  ).rows[0].storage_key;
+
+  const put = (images: unknown[]) =>
+    fetch(`${baseUrl}/api/v1/clubs/${clubId}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", authorization: `Bearer ${owner.token}` },
+      body: JSON.stringify({ images }),
+    });
+  const imageIds = async () =>
+    (
+      (await fetch(`${baseUrl}/api/v1/clubs/${clubId}`).then((response) => response.json())) as {
+        data: { images: Array<{ id: string; imageUrl: string }> };
+      }
+    ).data.images;
+
+  assert.equal((await put([{ imageUrl: "https://cdn.example.com/hall.png", sortOrder: 1 }])).status, 200);
+  let images = await imageIds();
+  assert.ok(images.some((image) => image.id === imageId), "uploaded image must survive a profile update");
+  assert.ok(images.some((image) => image.imageUrl === "https://cdn.example.com/hall.png"));
+
+  assert.equal((await put([])).status, 200);
+  images = await imageIds();
+  assert.deepEqual(images.map((image) => image.id), [imageId]);
+  assert.equal((await fetch(`${baseUrl}${url}`)).status, 200);
+
+  const remove = (token?: string, id = imageId) =>
+    fetch(`${baseUrl}/api/v1/clubs/${clubId}/images/${id}`, {
+      method: "DELETE",
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    });
+  assert.equal((await remove()).status, 401);
+  assert.equal((await remove(stranger.token)).status, 403);
+  assert.equal((await remove(owner.token)).status, 204);
+  assert.equal((await remove(owner.token)).status, 404);
+  assert.equal((await fetch(`${baseUrl}${url}`)).status, 404);
+  assert.deepEqual(await imageIds(), []);
+  await assert.rejects(objectStorage.get(storageKey));
+});

@@ -94,14 +94,15 @@ test("login and refresh endpoints rate limit repeated requests", async () => {
     (response) => response.status === 429,
   );
   assert.ok(limitedLogins.length >= 1);
-  assert.deepEqual(await limitedLogins[0].json(), {
-    success: false,
-    error: {
-      code: "RATE_LIMITED",
-      message:
-        "Kirish so‘rovlari soni chegaradan oshdi. Birozdan so‘ng qayta urinib ko‘ring.",
-    },
-  });
+  const limitedBody = (await limitedLogins[0].json()) as {
+    error: { code: string; message: string; requestId: string };
+  };
+  assert.equal(limitedBody.error.code, "RATE_LIMITED");
+  assert.equal(
+    limitedBody.error.message,
+    "Kirish so‘rovlari soni chegaradan oshdi. Birozdan so‘ng qayta urinib ko‘ring.",
+  );
+  assert.equal(typeof limitedBody.error.requestId, "string");
 
   const refreshResponses = await Promise.all(
     Array.from({ length: 21 }, () =>

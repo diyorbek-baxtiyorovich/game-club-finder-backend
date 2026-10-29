@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { AppError } from "../../common/errors/app-error.js";
-import { databasePool } from "../../config/database.js";
+import { containsPattern } from "../../common/sql.js";
+import { databasePool, withTransaction } from "../../config/database.js";
 import type {
   Club,
   ClubEquipment,
@@ -44,7 +45,7 @@ async function getClubDetails(
     gpu: string | null;
     ram_gb: number | null;
   }>(
-    "SELECT id::text, name, monitor_hz, cpu, gpu, ram_gb FROM club_equipment WHERE club_id = $1 ORDER BY id",
+    "SELECT id::text, name, monitor_hz, cpu, gpu, ram_gb FROM club_equipment WHERE club_id = $1 ORDER BY club_equipment.id",
     [clubId],
   );
   const features = await client.query<{
@@ -63,7 +64,7 @@ async function getClubDetails(
     discount_percent: string | null;
     currency: string;
   }>(
-    "SELECT id::text, category, name, hourly_price::text, discount_percent::text, currency FROM club_pricing WHERE club_id = $1 ORDER BY category, id",
+    "SELECT id::text, category, name, hourly_price::text, discount_percent::text, currency FROM club_pricing WHERE club_id = $1 ORDER BY category, club_pricing.id",
     [clubId],
   );
   const images = await client.query<{
@@ -76,7 +77,7 @@ async function getClubDetails(
     mime_type: string | null;
     size_bytes: number | null;
   }>(
-    "SELECT id::text, image_url, alt_text, sort_order, image_category, display_order, mime_type, size_bytes FROM club_images WHERE club_id = $1 ORDER BY display_order, sort_order, id",
+    "SELECT id::text, image_url, alt_text, sort_order, image_category, display_order, mime_type, size_bytes FROM club_images WHERE club_id = $1 ORDER BY display_order, sort_order, club_images.id",
     [clubId],
   );
   const games = await client.query<{ id: string; slug: string; name: string }>(
@@ -135,22 +136,6 @@ async function getClubDetails(
   };
 }
 
-async function transaction<T>(
-  work: (client: PoolClient) => Promise<T>,
-): Promise<T> {
-  const client = await databasePool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await work(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
 
 export async function listPublicClubs(
   query: ClubListQuery,
@@ -158,9 +143,9 @@ export async function listPublicClubs(
   const values: unknown[] = [];
   const predicates = ["status = 'approved'", "is_active = true"];
   if (query.q) {
-    values.push(`%${query.q}%`);
+    values.push(containsPattern(query.q));
     predicates.push(
-      `(name ILIKE $${values.length} OR description ILIKE $${values.length} OR address ILIKE $${values.length})`,
+      `(name ILIKE $${values.length} ESCAPE '\\' OR description ILIKE $${values.length} ESCAPE '\\' OR address ILIKE $${values.length} ESCAPE '\\')`,
     );
   }
   if (query.city) {
@@ -169,12 +154,12 @@ export async function listPublicClubs(
   }
   const where = predicates.join(" AND ");
   const orderBy = {
-    newest: "created_at DESC, id DESC",
-    name: "name ASC, id ASC",
+    newest: "created_at DESC, game_clubs.id DESC",
+    name: "name ASC, game_clubs.id ASC",
     price_low:
-      "(SELECT min(hourly_price) FROM club_pricing WHERE club_id = game_clubs.id) ASC NULLS LAST, id ASC",
+      "(SELECT min(hourly_price) FROM club_pricing WHERE club_id = game_clubs.id) ASC NULLS LAST, game_clubs.id ASC",
     price_high:
-      "(SELECT min(hourly_price) FROM club_pricing WHERE club_id = game_clubs.id) DESC NULLS LAST, id ASC",
+      "(SELECT min(hourly_price) FROM club_pricing WHERE club_id = game_clubs.id) DESC NULLS LAST, game_clubs.id ASC",
   }[query.sort];
   const limitIndex = values.push(query.limit);
   const offsetIndex = values.push((query.page - 1) * query.limit);
@@ -214,7 +199,7 @@ export async function listPublicClubs(
 }
 
 export async function findPublicClub(id: string): Promise<Club | null> {
-  return transaction(async (client) => {
+  return withTransaction(async (client) => {
     const result = await client.query<ClubRow>(
       `SELECT ${publicColumns} FROM game_clubs WHERE id = $1 AND status = 'approved' AND is_active = true`,
       [id],
@@ -237,16 +222,11 @@ async function replaceRows(
   clubId: string,
   columns: string[],
   rows: unknown[][],
-  removedStorageKeys: string[],
 ): Promise<void> {
-  if (table === "club_images") {
-    const removed = await client.query<{ storage_key: string | null }>(
-      "DELETE FROM club_images WHERE club_id=$1 RETURNING storage_key", [clubId],
-    );
-    removedStorageKeys.push(...removed.rows.flatMap((row) => row.storage_key ? [row.storage_key] : []));
-  } else {
-    await client.query(`DELETE FROM ${table} WHERE club_id = $1`, [clubId]);
-  }
+  // Uploaded images (storage_key set) are managed by the media endpoints,
+  // so a profile update only replaces URL-based image rows.
+  const keepUploaded = table === "club_images" ? " AND storage_key IS NULL" : "";
+  await client.query(`DELETE FROM ${table} WHERE club_id = $1${keepUploaded}`, [clubId]);
   if (rows.length === 0) return;
   const values: unknown[] = [];
   const tuples = rows.map((row) => {
@@ -267,7 +247,6 @@ async function replaceProfile(
   client: PoolClient,
   clubId: string,
   input: Partial<ClubInput>,
-  removedStorageKeys: string[],
 ): Promise<void> {
   if (input.equipment !== undefined)
     await replaceRows(
@@ -282,7 +261,6 @@ async function replaceProfile(
         item.gpu ?? null,
         item.ramGb ?? null,
       ]),
-      removedStorageKeys,
     );
   if (input.features !== undefined)
     await replaceRows(
@@ -291,7 +269,6 @@ async function replaceProfile(
       clubId,
       ["category", "name"],
       input.features.map((item) => [item.category, item.name]),
-      removedStorageKeys,
     );
   if (input.pricing !== undefined)
     await replaceRows(
@@ -306,7 +283,6 @@ async function replaceProfile(
         item.discountPercent ?? null,
         item.currency,
       ]),
-      removedStorageKeys,
     );
   if (input.images !== undefined)
     await replaceRows(
@@ -320,7 +296,6 @@ async function replaceProfile(
         item.sortOrder,
         item.sortOrder,
       ]),
-      removedStorageKeys,
     );
   if (input.gameIds !== undefined) {
     const found = await client.query<{ id: string }>(
@@ -339,7 +314,6 @@ async function replaceProfile(
       clubId,
       ["game_id"],
       input.gameIds.map((id) => [id]),
-      removedStorageKeys,
     );
   }
 }
@@ -348,7 +322,7 @@ export async function insertClubProfile(
   ownerId: string,
   input: ClubInput,
 ): Promise<Club> {
-  return transaction(async (client) => {
+  return withTransaction(async (client) => {
     await client.query("SELECT set_config('app.actor_user_id', $1, true)", [ownerId]);
     const result = await client.query<ClubRow>(
       `INSERT INTO game_clubs (owner_id, name, slug, description, address, city, location, working_hours, timezone)
@@ -368,7 +342,7 @@ export async function insertClubProfile(
       ],
     );
     const row = result.rows[0];
-    await replaceProfile(client, row.id, input, []);
+    await replaceProfile(client, row.id, input);
     return getClubDetails(client, row.id, row);
   });
 }
@@ -378,8 +352,7 @@ export async function updateClubProfile(
   actorId: string,
   input: Partial<ClubInput>,
 ): Promise<Club> {
-  const removedStorageKeys: string[] = [];
-  const updated = await transaction(async (client) => {
+  return withTransaction(async (client) => {
     await client.query("SELECT set_config('app.actor_user_id', $1, true)", [actorId]);
     const fields: string[] = [];
     const values: unknown[] = [id];
@@ -410,16 +383,13 @@ export async function updateClubProfile(
 
     if (!result.rows[0])
       throw new AppError(404, "CLUB_NOT_FOUND", "Klub topilmadi.");
-    await replaceProfile(client, id, input, removedStorageKeys);
+    await replaceProfile(client, id, input);
     return getClubDetails(client, id, result.rows[0]);
   });
-  const { objectStorage } = await import("../../integrations/storage/local-file-storage.js");
-  await Promise.all(removedStorageKeys.map((key) => objectStorage.delete(key).catch(() => undefined)));
-  return updated;
 }
 
 export async function softDeleteClub(id: string, actorId: string): Promise<void> {
-  await transaction(async (client) => {
+  await withTransaction(async (client) => {
     await client.query("SELECT set_config('app.actor_user_id', $1, true)", [actorId]);
     await client.query(
       "UPDATE game_clubs SET is_active = false, updated_at = current_timestamp WHERE id = $1 AND is_active = true",

@@ -75,7 +75,8 @@ export const errorHandler: ErrorRequestHandler = (
   };
 
   if (appError.statusCode >= 500) {
-    logger.error(logContext, "So‘rovda xatolik yuz berdi");
+    // The original error is logged for operators only; the client gets the safe message.
+    logger.error({ ...logContext, err: error }, "So‘rovda xatolik yuz berdi");
   } else {
     logger.warn(logContext, "So‘rov rad etildi");
   }

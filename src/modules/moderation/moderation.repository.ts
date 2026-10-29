@@ -1,6 +1,5 @@
-import type { PoolClient } from "pg";
 import { AppError } from "../../common/errors/app-error.js";
-import { databasePool } from "../../config/database.js";
+import { databasePool, withTransaction } from "../../config/database.js";
 
 export type ClubStatus = "pending" | "approved" | "rejected";
 
@@ -22,22 +21,6 @@ export interface SubmissionStatus {
   reason: string | null;
 }
 
-async function transaction<T>(
-  work: (client: PoolClient) => Promise<T>,
-): Promise<T> {
-  const client = await databasePool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await work(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
 
 export async function listPendingClubs(
   page: number,
@@ -55,7 +38,7 @@ export async function listPendingClubs(
     }>(
       `SELECT id::text, owner_id::text, name, slug, address, created_at FROM game_clubs
        WHERE status = 'pending' AND is_active = true
-       ORDER BY created_at ASC, id ASC LIMIT $1 OFFSET $2`,
+       ORDER BY created_at ASC, game_clubs.id ASC LIMIT $1 OFFSET $2`,
       [limit, offset],
     ),
     databasePool.query<{ total: string }>(
@@ -81,7 +64,7 @@ export async function changePendingClubStatus(
   status: Exclude<ClubStatus, "pending">,
   reason?: string,
 ): Promise<{ id: string; status: ClubStatus; updatedAt: string }> {
-  return transaction(async (client) => {
+  return withTransaction(async (client) => {
     await client.query("SELECT set_config('app.actor_user_id', $1, true)", [moderatorId]);
     const current = await client.query<{ status: ClubStatus }>(
       "SELECT status FROM game_clubs WHERE id = $1 AND is_active = true FOR UPDATE",

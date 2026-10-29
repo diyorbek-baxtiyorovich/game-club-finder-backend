@@ -38,6 +38,8 @@ services:
       PORT: 3000
       CORS_ORIGIN: ${CORS_ORIGIN:?Set CORS_ORIGIN in .env.production}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # nginx (proxy service) is one hop in front of the API.
+      TRUST_PROXY: 1
       DB_HOST: db
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:?Set DB_NAME in .env.production}
@@ -69,6 +71,7 @@ services:
     volumes:
       - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ${TLS_CERT_DIR:-./certs}:/etc/nginx/certs:ro
+      - ${ACME_WEBROOT:-./var/certbot}:/var/www/certbot:ro
     networks: [backend]
 
 volumes:

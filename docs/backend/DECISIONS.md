@@ -9,6 +9,9 @@ Bu fayl tasdiqlangan qarorlar va ochiq masalalarni saqlaydi. Qaror qabul qilinma
 | Real-time bandlik manbasi | OPEN | 15 | Jadval bo‘yicha ochiqlik hisoblanadi; sensor/club tizimi ulanmaguncha availability `occupancy: "unknown"` qaytaradi |
 | Production media storage provayderi | OPEN | 14 | Development/test local diskdan foydalanadi. Production uchun object storage/CDN tanlanmagan; interface bor, production upload hozircha 503 bilan yopiq. Video provider/format tanlanmagani uchun video upload ochilmagan. |
 | Hosting / CI provider | OPEN | 18 | Real production infra tanlangach moslash |
+| Tasdiqlangan klubni tahrirlash qayta moderatsiyaga tushadimi? | OPEN | 07–09 | Hozir `approved` klubning nomi, manzili, tavsifi, joylashuvi va rasmlari egasi tomonidan o‘zgartirilsa darhol public bo‘ladi (review esa tahrirda `pending`ga qaytadi). Qaror kelguncha xulq o‘zgartirilmadi; har bir o‘zgarish `audit_events`da `club.updated` sifatida qayd etiladi. |
+| Hard-delete (user/club) siyosati | OPEN | 16 | FK’lar aralash: favorites/history/sessions/reviews `CASCADE`, `club_ratings`, moderatsiya audit va `review_replies.owner_id` `RESTRICT`. Hozir faqat soft-delete ishlatiladi; GDPR-uslubida userni butunlay o‘chirish talab qilinsa, CASCADE / SET NULL / anonimlashtirish bo‘yicha qaror kerak. |
+| Narxlarda bir nechta valyuta | OPEN | 08/11 | `club_pricing.currency` har qatorda bor, lekin narx sort/filtr valyutani hisobga olmaydi (5 USD < 50000 UZS). Bitta valyuta (UZS) majburiy qilinadimi yoki konvertatsiya kerakmi — qaror kerak. |
 | Rad etilgan clubni qayta topshirish | OPEN | 09 | Moderatsiya faqat `pending → approved/rejected` o‘tishini qabul qiladi; qayta topshirish workflow’i biznes qarori kelguncha mavjud emas |
 
 ## Qabul qilingan qarorlar
@@ -29,3 +32,9 @@ Bu fayl tasdiqlangan qarorlar va ochiq masalalarni saqlaydi. Qaror qabul qilinma
 - `audit_events` actor, entity, action, changed field nomlari va status/role transition metadata’sini saqlaydi; club/review matni, manzil, Telegram ID va to‘liq row nusxasi saqlanmaydi. Eventlar append-only DB trigger bilan himoyalanadi. Role o‘zgarishi actor context’siz bajarilmaydi.
 - Image upload development/test’da `var/media` local storage adapter orqali ishlaydi; production’da adapter tanlanmaguncha upload 503 beradi. Faqat JPEG/PNG/WebP, 8 MiB/fayl, jami 20 rasm/club. Nom UUID bilan yaratiladi; original filename ishlatilmaydi. `club_images`da URL, storage key, MIME, byte hajmi, kategoriya va display order saqlanadi. Video faqat storage va format qarori qabul qilingandan keyin qo‘shiladi.
 - Redis/BullMQ, booking va payment: MVP boshlanishida shart emas.
+- Klub profilini `PUT /clubs/:id` bilan yangilashdagi `images` massivi faqat URL orqali berilgan rasmlarni almashtiradi; yuklangan (storage_key bor) rasmlar saqlanib qoladi va faqat `DELETE /clubs/:id/images/:imageId` orqali o‘chiriladi. Sabab: eski forma `images: []` yuborsa, yuklangan muqova fayllari yo‘qolib ketardi.
+- Klub sharhlari ro‘yxati (`GET /clubs/:id/reviews`) faqat klub `approved` va `is_active` bo‘lsa ochiladi, aks holda 404 — boshqa public endpointlar bilan bir xil.
+- Ommaviy qidiruvdagi `q` matni ILIKE uchun escape qilinadi: `%` va `_` oddiy belgi sifatida qidiriladi.
+- Review muallifi o‘z sharhini tahrirlaganda audit action `review.resubmitted`; admin qarori `review.moderated` bo‘lib qoladi (migration `1700000016000`).
+- API reverse proxy ortida ishlaganda `TRUST_PROXY` proxy hop soniga teng qo‘yiladi (Compose’da nginx bilan `1`), proxysiz `0`. Productionda `TELEGRAM_BOT_TOKEN` va `JWT_ACCESS_SECRET` majburiy; `.env.example` namunalari hech qachon qabul qilinmaydi.
+- Integratsion testlar faqat nomi `_test` bilan tugaydigan bazada ishga tushadi (`test/setup/db-guard.ts`).

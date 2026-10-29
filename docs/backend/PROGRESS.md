@@ -37,6 +37,20 @@
 > Codex har bosqich oxirida **faqat joriy bosqich** natijasini shu yerga yozadi. Eski hisobotlarni o‘chirmasdan qisqa arxiv sifatida qoldirishi mumkin.
 
 ```text
+Ish: Kod auditi topgan kamchiliklarni tuzatish (bosqichdan tashqari; 18-bosqich holati o‘zgarmadi)
+Holat: DONE — buglar tuzatildi, regressiya testlari qo‘shildi; biznes savollari DECISIONS.md’da OPEN.
+Tuzatildi:
+- Xavfsizlik: repoga tushgan JWT_ACCESS_SECRET lokal .env’da almashtirildi, .env.example bo‘sh; productionda TELEGRAM_BOT_TOKEN/JWT_ACCESS_SECRET majburiy, namuna qiymatlar rad etiladi; CORS_ORIGIN faqat origin; TRUST_PROXY (Compose’da 1) — rate limit nginx ortida real IP bo‘yicha; 429 umumiy xato formatida; 5xx logida asl xato; Swagger CSP (base-uri/form-action/frame-ancestors) va CDN SRI.
+- Ma’lumot: search openNow’dagi qavssiz OR pending/o‘chirilgan/boshqa shahar klublarini chiqarardi — tuzatildi, hafta kuni ham klub timezone’ida; audit va klub ichki ro‘yxatlarida id::text bo‘yicha (matn) saralash — sonli saralashga o‘tkazildi (1000+ yozuvda audit eng yangilarini ko‘rsatmasdi); PUT /clubs images yuklangan rasm fayllarini o‘chirmaydi, yangi DELETE /clubs/:id/images/:imageId; GET /clubs/:id/reviews faqat public klub uchun (aks holda 404); ILIKE’da % va _ escape; newLast30Days faqat faol klublar; review tahriri audit’da review.resubmitted (migration 1700000016000); umumiy withTransaction (ROLLBACK xatosi asl xatoni yashirmaydi, buzilgan client pool’dan chiqariladi).
+- DevOps: npm test faqat *_test bazada ishlaydi (test/setup/db-guard.ts); build oldidan dist tozalanadi; .nvmrc; CI faqat main push + PR, concurrency/timeout; nginx HSTS, http2, ACME webroot, proxy timeout.
+OPEN qarorlar (DECISIONS.md): tasdiqlangan klub tahriri qayta moderatsiyaga tushishi; hard-delete FK siyosati; narxlarda bir nechta valyuta.
+Tekshiruv: Docker PostGIS 18 toza test bazasida 17 migration PASS; 1700000016000 up→down→up PASS; db:seed PASS; npm run lint PASS; typecheck PASS; build PASS (dist’da eskirgan fayl qolmadi); npm test 57/57 PASS; yangi regressiya testlari eski kodga qaytarilganda FAIL bo‘lishi (openNow, audit tartibi, rasmlar, reviews ko‘rinishi) tekshirildi; nginx -t PASS; docker compose config PASS; dev bazaga 1700000016000 qo‘llandi, db:check PASS.
+Eslatma: dev bazada avvalgi testlardan qolgan ~1100 audit yozuvi bor (append-only, o‘chirilmadi). Eski JWT kaliti bilan berilgan tokenlar endi yaroqsiz — qayta login kerak.
+Keyingi bosqich: 18 production qabul mezonlari (hosting/domen/monitoring) — avtomatik boshlanmaydi.
+```
+
+
+```text
 Bosqich: 18 — Production / DevOps
 Holat: IN PROGRESS — lokal/container qabul sinovlari PASS; real production domeni, ishonchli TLS sertifikati, deploy muhiti va monitoring account’i bu repoda/host’da sozlanmagan.
 O‘zgargan fayllar: `Dockerfile`, `.dockerignore`, `compose.yaml`, `deploy/postgres/10-app-role.sh`, `deploy/nginx/default.conf`, `.github/workflows/backend-ci.yml`, `docs/backend/OPERATIONS.md`, `.gitignore`, `package.json`, `package-lock.json`, `docs/backend/PROGRESS.md`.

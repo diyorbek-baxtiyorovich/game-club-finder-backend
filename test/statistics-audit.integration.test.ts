@@ -260,3 +260,25 @@ test("statistics are role-protected, calculated from source tables, and audit ev
       error.code === "55000",
   );
 });
+
+test("audit list is ordered by numeric id, also across a digit-count boundary", async () => {
+  // Push the id sequence just below the next power of ten so new ids go
+  // e.g. 999 → 1000 → 1001. Sorting the ::text id would put "999" first.
+  const current = await databasePool.query<{ max: string | null }>("SELECT max(id)::text max FROM audit_events");
+  const next = 10 ** String(Number(current.rows[0].max ?? "0") + 2).length;
+  await databasePool.query("SELECT setval(pg_get_serial_sequence('audit_events','id'), $1)", [next - 2]);
+  const inserted = await databasePool.query<{ id: string }>(
+    `INSERT INTO audit_events (actor_id,entity_type,entity_id,action)
+     SELECT $1,'club','audit-order-test','club.updated' FROM generate_series(1,3) RETURNING id::text`,
+    [adminId],
+  );
+  const insertedIds = inserted.rows.map((row) => row.id);
+
+  const response = await request("/admin/audit?limit=100", "GET", adminToken);
+  assert.equal(response.status, 200);
+  const ids = ((await response.json()) as { data: Array<{ id: string }> }).data.map((event) => BigInt(event.id));
+  for (let index = 1; index < ids.length; index += 1) {
+    assert.ok(ids[index - 1] > ids[index], `audit ids must be numerically descending: ${ids[index - 1]} before ${ids[index]}`);
+  }
+  for (const id of insertedIds) assert.ok(ids.includes(BigInt(id)), `new audit event ${id} must be listed`);
+});

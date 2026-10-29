@@ -1,6 +1,5 @@
-import type { PoolClient } from "pg";
 import { AppError } from "../../common/errors/app-error.js";
-import { databasePool } from "../../config/database.js";
+import { databasePool, withTransaction } from "../../config/database.js";
 import type { ReviewInput } from "./reviews.schema.js";
 
 const scoreColumns = ["performance", "equipment", "service", "cleanliness", "comfort", "value_for_money"] as const;
@@ -9,26 +8,16 @@ const scoreValues = (input: ReviewInput) => [
 ];
 const averageSql = "round(($3::int + $4::int + $5::int + $6::int + $7::int + $8::int)::numeric / 6)::smallint";
 
-async function transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await databasePool.connect();
-  try {
-    await client.query("BEGIN");
-    const value = await work(client);
-    await client.query("COMMIT");
-    return value;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
 
 function requirePublicClub(rowCount: number | null): void {
   if (!rowCount) throw new AppError(404, "CLUB_NOT_FOUND", "Klub topilmadi.");
 }
 
 export async function listClubReviews(clubId: string, userId: string | null, page: number, limit: number) {
+  const club = await databasePool.query(
+    "SELECT 1 FROM game_clubs WHERE id = $1 AND status = 'approved' AND is_active = true", [clubId],
+  );
+  requirePublicClub(club.rowCount);
   const params = [clubId, userId, limit, (page - 1) * limit];
   const visibility = `(r.status = 'approved' AND r.is_flagged = false OR r.user_id = $2)`;
   const [items, count] = await Promise.all([
@@ -73,7 +62,7 @@ export async function listClubReviews(clubId: string, userId: string | null, pag
 }
 
 export async function createReview(userId: string, clubId: string, input: ReviewInput) {
-  return transaction(async (client) => {
+  return withTransaction(async (client) => {
     const club = await client.query(
       "SELECT id FROM game_clubs WHERE id = $1 AND status = 'approved' AND is_active = true FOR SHARE", [clubId],
     );
@@ -98,7 +87,7 @@ export async function createReview(userId: string, clubId: string, input: Review
 }
 
 export async function updateReview(reviewId: string, userId: string, input: ReviewInput) {
-  return transaction(async (client) => {
+  return withTransaction(async (client) => {
     await client.query("SELECT set_config('app.actor_user_id', $1, true)", [userId]);
     const current = await client.query<{ club_id: string }>(
       "SELECT club_id::text FROM reviews WHERE id=$1 AND user_id=$2 FOR UPDATE", [reviewId, userId],
@@ -120,7 +109,7 @@ export async function updateReview(reviewId: string, userId: string, input: Revi
 }
 
 export async function deleteReview(reviewId: string, userId: string): Promise<void> {
-  await transaction(async (client) => {
+  await withTransaction(async (client) => {
     const row = await client.query<{ club_id: string }>(
       "DELETE FROM reviews WHERE id=$1 AND user_id=$2 RETURNING club_id::text", [reviewId, userId],
     );
@@ -130,7 +119,7 @@ export async function deleteReview(reviewId: string, userId: string): Promise<vo
 }
 
 export async function replyToReview(reviewId: string, ownerId: string, body: string) {
-  return transaction(async (client) => {
+  return withTransaction(async (client) => {
     const row = await client.query<{ club_id: string; owner_id: string }>(
       `SELECT r.club_id::text,c.owner_id::text FROM reviews r JOIN game_clubs c ON c.id=r.club_id
        WHERE r.id=$1 AND r.status='approved' AND r.is_flagged=false AND c.is_active=true FOR UPDATE OF r`, [reviewId],
@@ -147,7 +136,7 @@ export async function replyToReview(reviewId: string, ownerId: string, body: str
 }
 
 export async function markHelpful(reviewId: string, userId: string) {
-  return transaction(async (client) => {
+  return withTransaction(async (client) => {
     const inserted = await client.query(
       `INSERT INTO review_helpful_votes (review_id,user_id)
        SELECT r.id,$2 FROM reviews r WHERE r.id=$1 AND r.status='approved' AND r.is_flagged=false AND r.user_id<>$2
@@ -163,7 +152,7 @@ export async function markHelpful(reviewId: string, userId: string) {
 }
 
 export async function moderateReview(reviewId: string, moderatorId: string, status: "approved" | "rejected", reason?: string) {
-  return transaction(async (client) => {
+  return withTransaction(async (client) => {
     await client.query("SELECT set_config('app.actor_user_id', $1, true)", [moderatorId]);
     const result = await client.query<{ id: string; status: string; moderated_at: Date }>(
       `UPDATE reviews SET status=$2,moderated_by=$3,moderation_reason=$4,moderated_at=current_timestamp,

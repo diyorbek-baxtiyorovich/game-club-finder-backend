@@ -30,6 +30,7 @@ test("OpenAPI document parses and freezes the implemented v1 route groups", asyn
     "/clubs/{id}/availability",
     "/clubs/{id}/stats",
     "/clubs/{id}/images",
+    "/clubs/{id}/images/{imageId}",
     "/media/{id}",
     "/clubs/{id}/reviews",
     "/reviews/{id}",

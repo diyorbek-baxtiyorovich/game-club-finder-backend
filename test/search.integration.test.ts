@@ -302,3 +302,49 @@ test("club search combines filters without duplicates and exposes only catalog-b
     assert.equal(response.status, 400);
   }
 });
+
+test("openNow keeps every other filter (overnight branch) and q matches % and _ literally", async () => {
+  // Every day 23:59 → 23:58 is an overnight interval, so "yesterday's" branch of
+  // the openNow SQL matches at almost any time of day.
+  const overnight = Object.fromEntries(
+    ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].map((day) => [day, [{ open: "23:59", close: "23:58" }]]),
+  );
+  const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const insert = async (name: string, city: string, status: string) => {
+    const row = await databasePool.query<{ id: string }>(
+      `INSERT INTO game_clubs (owner_id,name,slug,city,address,location,status,working_hours)
+       VALUES ($1,$2,$3,$4,'Overnight test address',ST_SetSRID(ST_MakePoint(69.24,41.3),4326)::geography,$5,$6::jsonb)
+       RETURNING id::text`,
+      [ownerId, name, `overnight-${status}-${stamp}`, city, status, JSON.stringify(overnight)],
+    );
+    clubIds.push(row.rows[0].id);
+    return row.rows[0].id;
+  };
+  const city = `OvernightCity${stamp}`;
+  const pendingId = await insert(`Overnight pending ${stamp}`, city, "pending");
+  const approvedId = await insert(`Overnight approved ${stamp}`, city, "approved");
+
+  const search = async (body: object) => {
+    const response = await fetch(`${baseUrl}/api/v1/search`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ limit: 100, ...body }),
+    });
+    assert.equal(response.status, 200);
+    return (await response.json()) as { data: Array<{ id: string }>; meta: { total: number } };
+  };
+
+  const open = await search({ openNow: true, city });
+  assert.deepEqual(open.data.map((club) => club.id), [approvedId]);
+  assert.equal(open.meta.total, 1);
+  assert.equal((await search({ openNow: true, city: `Elsewhere${stamp}` })).meta.total, 0);
+  const closed = await search({ openNow: false, city });
+  assert.equal(closed.data.some((club) => club.id === pendingId || club.id === approvedId), false);
+
+  const percent = await fetch(`${baseUrl}/api/v1/clubs?q=${encodeURIComponent("%")}&city=${city}&limit=100`);
+  assert.equal(percent.status, 200);
+  assert.equal(((await percent.json()) as { meta: { total: number } }).meta.total, 0);
+  assert.equal((await search({ q: "_", city })).meta.total, 0);
+  // Sanity check: the approved club is reachable through q when the text really matches.
+  assert.equal((await search({ q: "Overnight approved", city })).meta.total, 1);
+});

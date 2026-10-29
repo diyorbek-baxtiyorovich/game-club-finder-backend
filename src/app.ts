@@ -27,6 +27,8 @@ export function createApp(
   const app = express();
 
   app.disable("x-powered-by");
+  // Behind nginx, req.ip (used by rate limits) must come from X-Forwarded-For.
+  app.set("trust proxy", env.trustProxy);
   app.use(helmet());
   app.use(requestContext);
   app.use(cors({ origin: env.corsOrigins }));

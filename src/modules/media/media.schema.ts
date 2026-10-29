@@ -15,3 +15,9 @@ export const mediaIdRequestSchema = z.object({
 }).strict();
 
 export type MediaCategory = "cover" | "interior" | "equipment";
+
+export const mediaClubImageRequestSchema = z.object({
+  params: z.object({ id: mediaId, imageId: mediaId }).strict(),
+  query: z.object({}).strict(),
+  body: z.object({}).strict().optional(),
+}).strict();

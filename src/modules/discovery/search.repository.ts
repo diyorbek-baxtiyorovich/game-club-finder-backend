@@ -1,3 +1,4 @@
+import { containsPattern } from "../../common/sql.js";
 import { databasePool } from "../../config/database.js";
 import type { SearchBody } from "./search.schema.js";
 
@@ -28,7 +29,7 @@ interface SearchRow {
 export const isOpenNowSql = `EXISTS (
   SELECT 1
   FROM jsonb_array_elements(COALESCE(c.working_hours -> (
-    ARRAY['mon','tue','wed','thu','fri','sat','sun'])[EXTRACT(ISODOW FROM timezone('Asia/Tashkent', now()))::int],
+    ARRAY['mon','tue','wed','thu','fri','sat','sun'])[EXTRACT(ISODOW FROM timezone(c.timezone, now()))::int],
     '[]'::jsonb)) AS current_interval(value)
   WHERE CASE
     WHEN current_interval.value->>'open' = '00:00' AND current_interval.value->>'close' = '00:00' THEN true
@@ -40,7 +41,7 @@ export const isOpenNowSql = `EXISTS (
 ) OR EXISTS (
   SELECT 1
   FROM jsonb_array_elements(COALESCE(c.working_hours -> (
-    ARRAY['mon','tue','wed','thu','fri','sat','sun'])[((EXTRACT(ISODOW FROM timezone('Asia/Tashkent', now()))::int + 5) % 7) + 1],
+    ARRAY['mon','tue','wed','thu','fri','sat','sun'])[((EXTRACT(ISODOW FROM timezone(c.timezone, now()))::int + 5) % 7) + 1],
     '[]'::jsonb)) AS previous_interval(value)
   WHERE (previous_interval.value->>'close')::time < (previous_interval.value->>'open')::time
     AND timezone(c.timezone, now())::time < (previous_interval.value->>'close')::time
@@ -65,9 +66,9 @@ export async function searchClubs(
     return `$${params.length}`;
   };
   if (filters.q) {
-    const p = bind(`%${filters.q}%`);
+    const p = bind(containsPattern(filters.q));
     clauses.push(
-      `(c.name ILIKE ${p} OR c.description ILIKE ${p} OR c.address ILIKE ${p})`,
+      `(c.name ILIKE ${p} ESCAPE '\\' OR c.description ILIKE ${p} ESCAPE '\\' OR c.address ILIKE ${p} ESCAPE '\\')`,
     );
   }
   if (filters.city)
@@ -75,7 +76,8 @@ export async function searchClubs(
   if (filters.ratingMin !== undefined)
     clauses.push(`${publicRatingAverage} >= ${bind(filters.ratingMin)}`);
   if (filters.openNow !== undefined)
-    clauses.push(filters.openNow ? isOpenNowSql : `NOT ${isOpenNowSql}`);
+    // Parenthesised: isOpenNowSql contains a top-level OR.
+    clauses.push(filters.openNow ? `(${isOpenNowSql})` : `NOT (${isOpenNowSql})`);
   if (filters.location) {
     pointExpression = `ST_SetSRID(ST_MakePoint(${bind(filters.location.lng)}, ${bind(filters.location.lat)}),4326)::geography`;
     clauses.push(

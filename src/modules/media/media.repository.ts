@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { PoolClient } from "pg";
 import { AppError } from "../../common/errors/app-error.js";
-import { databasePool } from "../../config/database.js";
+import { databasePool, withTransaction } from "../../config/database.js";
 import { objectStorage } from "../../integrations/storage/local-file-storage.js";
 import type { MediaCategory } from "./media.schema.js";
 
@@ -26,20 +25,6 @@ function imageMime(bytes: Buffer): ImageMime | null {
   return null;
 }
 
-async function transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await databasePool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await work(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
 
 export function validateImage(bytes: Buffer, declaredMime: string): ImageMime {
   if (!(declaredMime in MIME_INFO)) {
@@ -64,7 +49,7 @@ export async function storeClubImage(
   const key = `${randomUUID()}.${info.extension}`;
   let stored = false;
   try {
-    return await transaction(async (client) => {
+    return await withTransaction(async (client) => {
       const club = await client.query<{ owner_id: string; is_active: boolean }>(
         "SELECT owner_id::text,is_active FROM game_clubs WHERE id=$1 FOR UPDATE", [clubId],
       );
@@ -101,4 +86,21 @@ export async function getPublicImage(id: string) {
   );
   if (!result.rows[0]) throw new AppError(404, "MEDIA_NOT_FOUND", "Rasm topilmadi.");
   return { mimeType: result.rows[0].mime_type, bytes: await objectStorage.get(result.rows[0].storage_key) };
+}
+
+export async function deleteClubImage(ownerId: string, clubId: string, imageId: string): Promise<void> {
+  const storageKey = await withTransaction(async (client) => {
+    const club = await client.query<{ owner_id: string; is_active: boolean }>(
+      "SELECT owner_id::text,is_active FROM game_clubs WHERE id=$1 FOR UPDATE", [clubId],
+    );
+    if (!club.rows[0] || !club.rows[0].is_active) throw new AppError(404, "CLUB_NOT_FOUND", "Faol klub topilmadi.");
+    if (club.rows[0].owner_id !== ownerId) throw new AppError(403, "FORBIDDEN", "Faqat klub egasi rasmni o‘chira oladi.");
+    const removed = await client.query<{ storage_key: string | null }>(
+      "DELETE FROM club_images WHERE id=$1 AND club_id=$2 RETURNING storage_key", [imageId, clubId],
+    );
+    if (!removed.rows[0]) throw new AppError(404, "MEDIA_NOT_FOUND", "Rasm topilmadi.");
+    return removed.rows[0].storage_key;
+  });
+  // The file is removed only after the row is gone for good.
+  if (storageKey) await objectStorage.delete(storageKey).catch(() => undefined);
 }

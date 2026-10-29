@@ -365,3 +365,15 @@ test("review moderation controls public ratings, protects authors and supports o
     200,
   );
 });
+
+test("club reviews are listed only while the club itself is public", async () => {
+  const owner = await createUser("club_owner");
+  const clubId = await createClub(owner.id);
+  assert.equal((await request(`/clubs/${clubId}/reviews`)).status, 200);
+
+  await databasePool.query("UPDATE game_clubs SET status='pending' WHERE id=$1", [clubId]);
+  assert.equal((await request(`/clubs/${clubId}/reviews`)).status, 404);
+
+  await databasePool.query("UPDATE game_clubs SET status='approved', is_active=false WHERE id=$1", [clubId]);
+  assert.equal((await request(`/clubs/${clubId}/reviews`)).status, 404);
+});
