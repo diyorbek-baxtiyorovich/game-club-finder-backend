@@ -5,6 +5,12 @@ import { env } from './config/env.js';
 
 const server = app.listen(env.port, () => {
   logger.info({ port: env.port }, 'API server ishga tushdi');
+  if (env.authDisabled) {
+    logger.warn(
+      { authDisabled: true },
+      'AUTH_DISABLED=true: tokensiz so‘rovlar dev user sifatida bajariladi. Faqat lokal ishlab chiqish uchun!',
+    );
+  }
 });
 
 let shuttingDown = false;

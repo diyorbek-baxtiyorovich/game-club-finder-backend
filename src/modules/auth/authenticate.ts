@@ -1,15 +1,27 @@
 import type { RequestHandler } from "express";
 import { AppError } from "../../common/errors/app-error.js";
 import { env } from "../../config/env.js";
+import { resolveDevUser } from "./dev-auth.js";
 import { verifyAccessToken } from "./jwt.service.js";
 import type { AuthenticatedUser } from "./auth.types.js";
 
 export function createAuthenticate(
   secret = env.jwtAccessSecret,
+  authDisabled = env.authDisabled,
 ): RequestHandler {
   return async (request, _response, next) => {
     const authorization = request.get("authorization");
     const match = authorization?.match(/^Bearer\s+([^\s]+)$/i);
+    if (!match && authDisabled) {
+      // AUTH_DISABLED (local dev only): act as a dev user, role from X-Dev-Role.
+      try {
+        request.auth = await resolveDevUser(request.get("x-dev-role"));
+        next();
+      } catch (error) {
+        next(error);
+      }
+      return;
+    }
     if (!match) {
       next(
         new AppError(401, "UNAUTHENTICATED", "Tizimga kirish talab qilinadi."),
@@ -43,7 +55,7 @@ export const optionalAuthenticate: RequestHandler = (
   response,
   next,
 ) => {
-  if (!request.get("authorization")) {
+  if (!request.get("authorization") && !env.authDisabled) {
     next();
     return;
   }

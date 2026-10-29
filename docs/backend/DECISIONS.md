@@ -38,3 +38,4 @@ Bu fayl tasdiqlangan qarorlar va ochiq masalalarni saqlaydi. Qaror qabul qilinma
 - Review muallifi o‘z sharhini tahrirlaganda audit action `review.resubmitted`; admin qarori `review.moderated` bo‘lib qoladi (migration `1700000016000`).
 - API reverse proxy ortida ishlaganda `TRUST_PROXY` proxy hop soniga teng qo‘yiladi (Compose’da nginx bilan `1`), proxysiz `0`. Productionda `TELEGRAM_BOT_TOKEN` va `JWT_ACCESS_SECRET` majburiy; `.env.example` namunalari hech qachon qabul qilinmaydi.
 - Integratsion testlar faqat nomi `_test` bilan tugaydigan bazada ishga tushadi (`test/setup/db-guard.ts`).
+- Vaqtinchalik: Telegram bot ulanmaguncha lokal frontend ishlab chiqish uchun `AUTH_DISABLED=true` bypass bor. U faqat token'siz so‘rovlarga ta’sir qiladi, `X-Dev-Role` bo‘yicha haqiqiy dev userlarni (telegram_id 900000000001–3) ishlatadi va productionda env tekshiruvi tomonidan rad etiladi. Telegram login tayyor bo‘lgach o‘chiriladi.

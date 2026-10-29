@@ -56,6 +56,15 @@ Telegram Mini App login uchun `.env`da `TELEGRAM_BOT_TOKEN`ni BotFather’dan ol
 
 Access token 15 daqiqa, refresh token 30 kun amal qiladi. Owner rolini berish workflow’i alohida qaror bo‘lib qoladi; login orqali ham, request body orqali ham rol oshirilmaydi.
 
+## Auth'ni vaqtincha o‘chirish (lokal frontend uchun)
+
+Telegram bot ulanmaguncha frontendni lokal qurish uchun `.env`da `AUTH_DISABLED=true` qo‘ying va serverni qayta ishga tushiring. Shunda `Authorization` header'siz har bir so‘rov haqiqiy dev user sifatida bajariladi (dev userlar `users` jadvalida `telegram_id` 900000000001–3 bilan avtomatik yaratiladi).
+
+- Default rol `admin`. Boshqa rol kerak bo‘lsa header yuboring: `X-Dev-Role: user` (masalan sharh yozish) yoki `X-Dev-Role: club_owner` (klub rasmi yuklash, sharhga javob).
+- `Authorization: Bearer ...` yuborilsa, oddiy JWT tekshiruvi ishlaydi.
+- `NODE_ENV=production` bilan `AUTH_DISABLED=true` bo‘lsa server ishga tushmaydi. `npm test` bu sozlamani har doim o‘chirib ishlaydi.
+- Telegram login tayyor bo‘lgach `AUTH_DISABLED=false` qiling.
+
 ## Testlar
 
 Testlar real PostgreSQL/PostGIS bazasiga ulanadi. Ular fixture ma’lumotlarni vaqtincha yozib, asosiy qatorlarni testdan so‘ng tozalaydi; append-only audit hodisalari saqlanadi. Testni ishlab turgan yoki muhim ma’lumotli bazada emas, alohida lokal baza bilan bajaring.

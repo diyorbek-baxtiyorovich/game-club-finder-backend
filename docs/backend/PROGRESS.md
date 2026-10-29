@@ -37,6 +37,14 @@
 > Codex har bosqich oxirida **faqat joriy bosqich** natijasini shu yerga yozadi. Eski hisobotlarni o‘chirmasdan qisqa arxiv sifatida qoldirishi mumkin.
 
 ```text
+Ish: Lokal frontend uchun auth’ni vaqtincha o‘chirish (bosqichdan tashqari)
+Holat: DONE — `.env`da AUTH_DISABLED=true. Token’siz so‘rovlar dev user (default admin, X-Dev-Role: user|club_owner|admin) sifatida bajariladi; real Bearer token bo‘lsa oddiy JWT tekshiruvi.
+Xavfsizlik: NODE_ENV=production + AUTH_DISABLED=true → env xatosi, server ishga tushmaydi; startup’da ogohlantirish logi; npm test bypass’ni majburan o‘chiradi.
+Tekshiruv: typecheck/lint PASS; toza PostGIS test bazasida npm test 59/59 PASS (yangi env va dev-auth testlari bilan); dev serverda token’siz /users/me, /admin/stats, /admin/clubs/pending, /favorites, /history → 200; noto‘g‘ri X-Dev-Role → 400; CORS preflight X-Dev-Role’ga ruxsat beradi.
+Qaytarish: Telegram login tayyor bo‘lgach `.env`da AUTH_DISABLED=false.
+```
+
+```text
 Ish: Kod auditi topgan kamchiliklarni tuzatish (bosqichdan tashqari; 18-bosqich holati o‘zgarmadi)
 Holat: DONE — buglar tuzatildi, regressiya testlari qo‘shildi; biznes savollari DECISIONS.md’da OPEN.
 Tuzatildi:

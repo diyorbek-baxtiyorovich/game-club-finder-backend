@@ -26,6 +26,8 @@ const envSchema = z.object({
     .pipe(z.array(corsOrigin).min(1)),
   // Number of reverse-proxy hops in front of the API (nginx = 1). 0 = no proxy.
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
+  // Local frontend development only: requests without a token act as a dev user.
+  AUTH_DISABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
@@ -37,6 +39,9 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: optionalSecret(z.string().min(1)),
   JWT_ACCESS_SECRET: optionalSecret(z.string().min(32)),
 }).superRefine((value, context) => {
+  if (value.AUTH_DISABLED && value.NODE_ENV === "production") {
+    context.addIssue({ code: "custom", path: ["AUTH_DISABLED"], message: "Productionda autentifikatsiyani o‘chirib bo‘lmaydi." });
+  }
   for (const key of ["TELEGRAM_BOT_TOKEN", "JWT_ACCESS_SECRET"] as const) {
     const secret = value[key];
     if (secret !== undefined && PLACEHOLDER_PATTERN.test(secret)) {
@@ -75,6 +80,7 @@ export const env = {
   corsOrigins: parsedEnv.CORS_ORIGIN,
   logLevel: parsedEnv.LOG_LEVEL,
   trustProxy: parsedEnv.TRUST_PROXY,
+  authDisabled: parsedEnv.AUTH_DISABLED,
   database: {
     host: parsedEnv.DB_HOST,
     port: parsedEnv.DB_PORT,

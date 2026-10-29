@@ -20,6 +20,7 @@ test("environment values are validated and CORS origins are parsed", () => {
       PORT: 3123,
       CORS_ORIGIN: ["http://localhost:5173", "https://example.com"],
       TRUST_PROXY: 0,
+      AUTH_DISABLED: false,
       LOG_LEVEL: "info",
       DB_HOST: "localhost",
       DB_PORT: 5432,
@@ -114,4 +115,20 @@ test("CORS_ORIGIN accepts only bare origins", () => {
   assert.deepEqual(parseEnv({ ...baseEnv, CORS_ORIGIN: "https://app.example.com:8443" }).CORS_ORIGIN, [
     "https://app.example.com:8443",
   ]);
+});
+
+test("AUTH_DISABLED is a local-development switch and is refused in production", () => {
+  assert.equal(parseEnv({ ...baseEnv, AUTH_DISABLED: "true" }).AUTH_DISABLED, true);
+  assert.throws(
+    () =>
+      parseEnv({
+        ...baseEnv,
+        NODE_ENV: "production",
+        AUTH_DISABLED: "true",
+        TELEGRAM_BOT_TOKEN: "123:abc",
+        JWT_ACCESS_SECRET: strongSecret,
+      }),
+    /AUTH_DISABLED/,
+  );
+  assert.throws(() => parseEnv({ ...baseEnv, AUTH_DISABLED: "yes" }), /AUTH_DISABLED/);
 });

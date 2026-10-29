@@ -19,6 +19,8 @@ Authentication uses `Authorization: Bearer <accessToken>`. Access tokens expire 
 | `GET /clubs/nearby` | Public | `lat` and `lng` together with optional `radius` (1–50,000 m), or `city`; returns approved active clubs. |
 | `GET /clubs/:id` | Public; optional token | Full public club profile; authenticated reads can record view history. |
 | `POST /clubs` | `club_owner` or `admin` | Creates a pending club. Body includes name, slug, address, `{lng,lat}` and optional equipment, features, pricing, images, gameIds, workingHours, timezone. |
+> **Local dev:** with `AUTH_DISABLED=true` (refused in production) requests without `Authorization` run as a dev user; role via `X-Dev-Role: admin|club_owner|user` (default `admin`).
+
 | `PUT /clubs/:id` | `club_owner` or `admin`; object ownership checked | Updates supplied club fields. An `images` array replaces only URL-based images; uploaded images are kept. |
 | `DELETE /clubs/:id` | `club_owner` or `admin`; object ownership checked | Soft-deletes the club. |
 | `GET /clubs/:id/availability` | Public | Current open state and timezone; occupancy is `unknown` until a live source is connected. |
